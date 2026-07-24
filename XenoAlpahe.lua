@@ -1,5 +1,5 @@
--- XenoAlpha MultiTool v2.0 - Полная переработка
--- Уникальный дизайн с снежинками, полупрозрачностью, новыми функциями
+-- XenoAlpha MultiTool v3.0 - Полная переработка с CSS стилями
+-- Гладкий дизайн, иконки, улучшенный аимбот, выбор режима
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -10,6 +10,10 @@ local Lighting = game:GetService("Lighting")
 local Camera = Workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
 local Mouse = LocalPlayer:GetMouse()
+local HttpService = game:GetService("HttpService")
+
+-- // ВЫБОР РЕЖИМА РАБОТЫ
+local ModeSelect = "Multi" -- "Multi", "MMV", "Rivals"
 
 -- // КОНФИГУРАЦИЯ
 local Config = {
@@ -17,7 +21,16 @@ local Config = {
         MainColor = Color3.fromRGB(100, 150, 255),
         AccentColor = Color3.fromRGB(255, 100, 200),
         Background = Color3.fromRGB(10, 10, 20),
-        Transparency = 0.85
+        Transparency = 0.85,
+        Roundness = 20,
+        GlowIntensity = 0.3
+    },
+    Settings = {
+        LowPerformance = false,
+        ShowSnowflakes = true,
+        SnowflakeCount = 30,
+        AnimationSpeed = 1.0,
+        AutoSave = true
     },
     Keybinds = {
         ToggleUI = Enum.KeyCode.Insert,
@@ -30,7 +43,10 @@ local Config = {
         RageMode = Enum.KeyCode.R,
         GodMode = Enum.KeyCode.G,
         Invis = Enum.KeyCode.I,
-        Teleport = Enum.KeyCode.T
+        Teleport = Enum.KeyCode.T,
+        TriggerBot = Enum.KeyCode.Q,
+        AimBot = Enum.KeyCode.LeftAlt,
+        MurdererKill = Enum.KeyCode.M
     },
     Functions = {
         Bhop = false,
@@ -42,19 +58,23 @@ local Config = {
         GodMode = false,
         Invisible = false,
         AutoHeal = false,
-        NoFall = false
+        NoFall = false,
+        TeleportToMouse = false
     },
     Rage = {
         Enabled = false,
         Aimbot = false,
         FOV = 120,
+        FOVCircle = false,
         TargetPart = "Head",
         WallShot = false,
         Fling = false,
         TargetPlayer = nil,
         SilentAim = false,
         TriggerBot = false,
-        AntiAim = false
+        AntiAim = false,
+        Smoothness = 0.3,
+        Prediction = 0.15
     },
     MMV = {
         AutoFarm = false,
@@ -62,7 +82,12 @@ local Config = {
         SpeedBoost = false,
         JumpBoost = false,
         AutoClick = false,
-        AntiAFK = false
+        AntiAFK = false,
+        AutoQuest = false,
+        AutoOpenChests = false,
+        AutoFish = false,
+        AutoMine = false,
+        AutoFight = false
     },
     Rivals = {
         Aimbot = false,
@@ -71,11 +96,471 @@ local Config = {
         AutoWall = false,
         FastReload = false,
         NoRecoil = false,
-        InstaKill = false
+        InstaKill = false,
+        SilentAim = false,
+        AutoAim = false,
+        KillAll = false
     }
 }
 
--- // СНЕЖИНКИ (Уникальный визуальный эффект)
+-- // CSS СТИЛИ (Имитация через свойства)
+local CSS = {
+    MainFrame = "background: rgba(10, 10, 20, 0.85); border-radius: 20px; border: 2px solid rgba(100, 150, 255, 0.3); box-shadow: 0 0 30px rgba(100, 150, 255, 0.2); backdrop-filter: blur(10px);",
+    TitleBar = "background: rgba(255, 255, 255, 0.05); border-radius: 20px 20px 0 0;",
+    TabButton = "background: rgba(255, 255, 255, 0.05); border-radius: 10px; transition: all 0.3s;",
+    TabButtonActive = "background: rgba(100, 150, 255, 0.3); border-radius: 10px;",
+    Toggle = "background: rgba(255, 255, 255, 0.1); border-radius: 10px;",
+    ToggleOn = "background: rgba(60, 180, 100, 0.3); border-radius: 10px;",
+    Button = "background: rgba(100, 150, 255, 0.2); border-radius: 10px; transition: all 0.3s;",
+    ButtonHover = "background: rgba(100, 150, 255, 0.4); border-radius: 10px;"
+}
+
+-- // СОЗДАНИЕ GUI С CSS СТИЛЯМИ
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "XenoAlphaGUI"
+ScreenGui.Parent = game:GetService("CoreGui")
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 700, 0, 550)
+MainFrame.Position = UDim2.new(0.5, -350, 0.5, -275)
+MainFrame.BackgroundColor3 = Config.Theme.Background
+MainFrame.BackgroundTransparency = 0.15
+MainFrame.BorderSizePixel = 0
+MainFrame.ClipsDescendants = true
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.Parent = ScreenGui
+
+-- Скругление углов (эффект округления)
+local Corner = Instance.new("UICorner")
+Corner.CornerRadius = UDim.new(0, Config.Theme.Roundness)
+Corner.Parent = MainFrame
+
+-- Эффект стекла
+local GlassEffect = Instance.new("Frame")
+GlassEffect.Size = UDim2.new(1, 0, 1, 0)
+GlassEffect.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+GlassEffect.BackgroundTransparency = 0.9
+GlassEffect.BorderSizePixel = 0
+GlassEffect.Parent = MainFrame
+local GlassCorner = Instance.new("UICorner")
+GlassCorner.CornerRadius = UDim.new(0, Config.Theme.Roundness)
+GlassCorner.Parent = GlassEffect
+
+-- Градиентная рамка с подсветкой
+local GlowFrame = Instance.new("Frame")
+GlowFrame.Size = UDim2.new(1, 4, 1, 4)
+GlowFrame.Position = UDim2.new(0, -2, 0, -2)
+GlowFrame.BackgroundColor3 = Config.Theme.MainColor
+GlowFrame.BackgroundTransparency = 0.7
+GlowFrame.BorderSizePixel = 0
+GlowFrame.Parent = MainFrame
+local GlowCorner = Instance.new("UICorner")
+GlowCorner.CornerRadius = UDim.new(0, Config.Theme.Roundness + 2)
+GlowCorner.Parent = GlowFrame
+
+local Gradient = Instance.new("UIGradient")
+Gradient.Color = ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Config.Theme.MainColor),
+    ColorSequenceKeypoint.new(0.5, Config.Theme.AccentColor),
+    ColorSequenceKeypoint.new(1, Config.Theme.MainColor)
+}
+Gradient.Rotation = 45
+Gradient.Parent = GlowFrame
+
+-- // ЗАГОЛОВОК С ИКОНКАМИ
+local TitleBar = Instance.new("Frame")
+TitleBar.Size = UDim2.new(1, 0, 0, 50)
+TitleBar.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+TitleBar.BackgroundTransparency = 0.95
+TitleBar.BorderSizePixel = 0
+TitleBar.Parent = MainFrame
+local TitleCorner = Instance.new("UICorner")
+TitleCorner.CornerRadius = UDim.new(0, Config.Theme.Roundness)
+TitleCorner.Parent = TitleBar
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(0, 250, 1, 0)
+Title.Position = UDim2.new(0, 15, 0, 0)
+Title.BackgroundTransparency = 1
+Title.Text = "✦ XenoAlpha v3.0 ✦"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.Font = Enum.Font.GothamSemibold
+Title.TextSize = 18
+Title.Parent = TitleBar
+
+-- Кнопки управления с иконками
+local function CreateWindowButton(text, color, position, icon)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0, 35, 1, 0)
+    btn.Position = UDim2.new(1, position, 0, 0)
+    btn.BackgroundTransparency = 1
+    btn.Text = icon or text
+    btn.TextColor3 = color
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 18
+    btn.Parent = TitleBar
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 10)
+    corner.Parent = btn
+    return btn
+end
+
+local MinifyBtn = CreateWindowButton("─", Color3.fromRGB(200, 200, 200), -105, "🗕")
+local HideBtn = CreateWindowButton("✕", Color3.fromRGB(255, 150, 150), -70, "🗖")
+local CloseBtn = CreateWindowButton("✖", Color3.fromRGB(255, 50, 50), -35, "✕")
+
+-- // ВКЛАДКИ С ИКОНКАМИ
+local TabContainer = Instance.new("Frame")
+TabContainer.Size = UDim2.new(1, -20, 0, 45)
+TabContainer.Position = UDim2.new(0, 10, 0, 50)
+TabContainer.BackgroundTransparency = 1
+TabContainer.BorderSizePixel = 0
+TabContainer.Parent = MainFrame
+
+local Tabs = {
+    {name = "Keybinds", icon = "⌨"},
+    {name = "Functions", icon = "⚙"},
+    {name = "Rage", icon = "⚔"},
+    {name = "MMV", icon = "🎮"},
+    {name = "Rivals", icon = "🔫"},
+    {name = "Settings", icon = "⚙"}
+}
+
+local TabButtons = {}
+local TabContents = {}
+
+for i, tab in ipairs(Tabs) do
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0, 110, 1, 0)
+    btn.Position = UDim2.new(0, (i-1)*115, 0, 0)
+    btn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    btn.BackgroundTransparency = 0.9
+    btn.BorderSizePixel = 0
+    btn.Text = tab.icon .. " " .. tab.name
+    btn.TextColor3 = Color3.fromRGB(200, 200, 200)
+    btn.Font = Enum.Font.GothamMedium
+    btn.TextSize = 13
+    btn.Parent = TabContainer
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 10)
+    corner.Parent = btn
+    TabButtons[tab.name] = btn
+    
+    -- Контент вкладки
+    local content = Instance.new("ScrollingFrame")
+    content.Size = UDim2.new(1, -20, 1, -100)
+    content.Position = UDim2.new(0, 10, 0, 100)
+    content.BackgroundTransparency = 1
+    content.BorderSizePixel = 0
+    content.CanvasSize = UDim2.new(0, 0, 0, 0)
+    content.ScrollBarThickness = 4
+    content.Visible = (i == 1)
+    content.Parent = MainFrame
+    TabContents[tab.name] = content
+end
+
+-- // УТИЛИТЫ ДЛЯ СОЗДАНИЯ ЭЛЕМЕНТОВ
+local function CreateToggle(parent, label, configTable, configKey, yPos, color, icon)
+    local row = Instance.new("Frame")
+    row.Size = UDim2.new(1, -20, 0, 35)
+    row.Position = UDim2.new(0, 10, 0, yPos)
+    row.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    row.BackgroundTransparency = 0.9
+    row.BorderSizePixel = 0
+    row.Parent = parent
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 10)
+    corner.Parent = row
+    
+    local lbl = Instance.new("TextLabel")
+    lbl.Size = UDim2.new(0, 250, 1, 0)
+    lbl.Position = UDim2.new(0, 5, 0, 0)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = (icon or "•") .. " " .. label
+    lbl.TextColor3 = Color3.fromRGB(220, 220, 255)
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.Font = Enum.Font.Gotham
+    lbl.TextSize = 13
+    lbl.Parent = row
+    
+    local toggle = Instance.new("TextButton")
+    toggle.Size = UDim2.new(0, 80, 1, 0)
+    toggle.Position = UDim2.new(1, -90, 0, 0)
+    toggle.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+    toggle.Text = "OFF"
+    toggle.TextColor3 = Color3.fromRGB(200, 200, 200)
+    toggle.Font = Enum.Font.GothamBold
+    toggle.TextSize = 12
+    toggle.Parent = row
+    local toggleCorner = Instance.new("UICorner")
+    toggleCorner.CornerRadius = UDim.new(0, 8)
+    toggleCorner.Parent = toggle
+    
+    toggle.MouseButton1Click:Connect(function()
+        configTable[configKey] = not configTable[configKey]
+        toggle.Text = configTable[configKey] and "ON" or "OFF"
+        toggle.BackgroundColor3 = configTable[configKey] and (color or Color3.fromRGB(60, 180, 100)) or Color3.fromRGB(60, 60, 80)
+    end)
+    
+    return row
+end
+
+local function CreateKeybind(parent, label, configKey, yPos, icon)
+    local row = Instance.new("Frame")
+    row.Size = UDim2.new(1, -20, 0, 35)
+    row.Position = UDim2.new(0, 10, 0, yPos)
+    row.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    row.BackgroundTransparency = 0.9
+    row.BorderSizePixel = 0
+    row.Parent = parent
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 10)
+    corner.Parent = row
+    
+    local lbl = Instance.new("TextLabel")
+    lbl.Size = UDim2.new(0, 250, 1, 0)
+    lbl.Position = UDim2.new(0, 5, 0, 0)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = (icon or "⌨") .. " " .. label
+    lbl.TextColor3 = Color3.fromRGB(220, 220, 255)
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.Font = Enum.Font.Gotham
+    lbl.TextSize = 13
+    lbl.Parent = row
+    
+    local keyLabel = Instance.new("TextButton")
+    keyLabel.Size = UDim2.new(0, 120, 1, 0)
+    keyLabel.Position = UDim2.new(1, -130, 0, 0)
+    keyLabel.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
+    keyLabel.Text = tostring(Config.Keybinds[configKey]):gsub("Enum.KeyCode.", "")
+    keyLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    keyLabel.Font = Enum.Font.GothamBold
+    keyLabel.TextSize = 12
+    keyLabel.Parent = row
+    local keyCorner = Instance.new("UICorner")
+    keyCorner.CornerRadius = UDim.new(0, 8)
+    keyCorner.Parent = keyLabel
+    
+    keyLabel.MouseButton1Click:Connect(function()
+        keyLabel.Text = "..."
+        local waitPress
+        waitPress = UserInputService.InputBegan:Connect(function(input, processed)
+            if not processed and input.UserInputType == Enum.UserInputType.Keyboard then
+                Config.Keybinds[configKey] = input.KeyCode
+                keyLabel.Text = tostring(input.KeyCode):gsub("Enum.KeyCode.", "")
+                waitPress:Disconnect()
+            end
+        end)
+    end)
+    
+    return row
+end
+
+local function CreateSlider(parent, label, configTable, configKey, min, max, yPos, icon)
+    local row = Instance.new("Frame")
+    row.Size = UDim2.new(1, -20, 0, 35)
+    row.Position = UDim2.new(0, 10, 0, yPos)
+    row.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    row.BackgroundTransparency = 0.9
+    row.BorderSizePixel = 0
+    row.Parent = parent
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 10)
+    corner.Parent = row
+    
+    local lbl = Instance.new("TextLabel")
+    lbl.Size = UDim2.new(0, 200, 1, 0)
+    lbl.Position = UDim2.new(0, 5, 0, 0)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = (icon or "◈") .. " " .. label
+    lbl.TextColor3 = Color3.fromRGB(220, 220, 255)
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.Font = Enum.Font.Gotham
+    lbl.TextSize = 13
+    lbl.Parent = row
+    
+    local slider = Instance.new("TextBox")
+    slider.Size = UDim2.new(0, 100, 1, 0)
+    slider.Position = UDim2.new(1, -110, 0, 0)
+    slider.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
+    slider.Text = tostring(configTable[configKey])
+    slider.TextColor3 = Color3.fromRGB(255, 255, 255)
+    slider.Font = Enum.Font.GothamBold
+    slider.TextSize = 12
+    slider.Parent = row
+    local sliderCorner = Instance.new("UICorner")
+    sliderCorner.CornerRadius = UDim.new(0, 8)
+    sliderCorner.Parent = slider
+    
+    slider.FocusLost:Connect(function()
+        local val = tonumber(slider.Text)
+        if val then
+            configTable[configKey] = math.clamp(val, min, max)
+            slider.Text = tostring(configTable[configKey])
+        end
+    end)
+    
+    return row
+end
+
+-- // ЗАПОЛНЕНИЕ ВКЛАДОК
+local function SetupTabs()
+    -- KEYBINDS TAB
+    local keyContent = TabContents["Keybinds"]
+    local keyRows = {
+        {"ToggleUI", "🔄"},
+        {"Bhop", "🏃"},
+        {"Fly", "✈"},
+        {"InfinityJump", "⬆"},
+        {"SpeedHack", "💨"},
+        {"Noclip", "🚪"},
+        {"Esp", "👁"},
+        {"RageMode", "⚔"},
+        {"GodMode", "👑"},
+        {"Invis", "👻"},
+        {"Teleport", "🌀"},
+        {"TriggerBot", "🎯"},
+        {"AimBot", "🎯"},
+        {"MurdererKill", "🔪"}
+    }
+    for i, row in ipairs(keyRows) do
+        CreateKeybind(keyContent, row[1], row[1], 8 + (i-1)*40, row[2])
+    end
+    keyContent.CanvasSize = UDim2.new(0, 0, 0, #keyRows * 40 + 20)
+    
+    -- FUNCTIONS TAB
+    local funcContent = TabContents["Functions"]
+    local funcList = {
+        {"Bhop", "🏃"},
+        {"Fly", "✈"},
+        {"InfinityJump", "⬆"},
+        {"SpeedHack", "💨"},
+        {"Noclip", "🚪"},
+        {"Esp", "👁"},
+        {"GodMode", "👑"},
+        {"Invisible", "👻"},
+        {"AutoHeal", "💚"},
+        {"NoFall", "🛡"},
+        {"TeleportToMouse", "🌀"}
+    }
+    for i, fname in ipairs(funcList) do
+        local color = Color3.fromRGB(60, 180, 100)
+        if fname[1] == "GodMode" or fname[1] == "Invisible" then
+            color = Color3.fromRGB(180, 60, 200)
+        end
+        CreateToggle(funcContent, fname[1], Config.Functions, fname[1], 8 + (i-1)*40, color, fname[2])
+    end
+    funcContent.CanvasSize = UDim2.new(0, 0, 0, #funcList * 40 + 20)
+    
+    -- RAGE TAB
+    local rageContent = TabContents["Rage"]
+    local rageElements = {
+        {type = "toggle", label = "Rage Mode", key = "Enabled", color = Color3.fromRGB(180, 60, 60), icon = "⚔"},
+        {type = "toggle", label = "Aimbot", key = "Aimbot", color = Color3.fromRGB(180, 60, 60), icon = "🎯"},
+        {type = "toggle", label = "TriggerBot", key = "TriggerBot", color = Color3.fromRGB(180, 60, 60), icon = "🔫"},
+        {type = "toggle", label = "Silent Aim", key = "SilentAim", color = Color3.fromRGB(180, 60, 60), icon = "🤫"},
+        {type = "toggle", label = "AntiAim", key = "AntiAim", color = Color3.fromRGB(180, 60, 60), icon = "🌀"},
+        {type = "toggle", label = "WallShot", key = "WallShot", color = Color3.fromRGB(180, 60, 60), icon = "🧱"},
+        {type = "toggle", label = "Fling", key = "Fling", color = Color3.fromRGB(180, 60, 60), icon = "💫"},
+        {type = "toggle", label = "FOV Circle", key = "FOVCircle", color = Color3.fromRGB(180, 60, 60), icon = "⭕"},
+        {type = "slider", label = "FOV", key = "FOV", min = 30, max = 360, icon = "📏"},
+        {type = "slider", label = "Smoothness", key = "Smoothness", min = 0.1, max = 1.0, icon = "🎚"},
+        {type = "slider", label = "Prediction", key = "Prediction", min = 0.0, max = 0.5, icon = "📈"}
+    }
+    
+    for i, elem in ipairs(rageElements) do
+        if elem.type == "toggle" then
+            CreateToggle(rageContent, elem.label, Config.Rage, elem.key, 8 + (i-1)*40, elem.color, elem.icon)
+        elseif elem.type == "slider" then
+            CreateSlider(rageContent, elem.label, Config.Rage, elem.key, elem.min, elem.max, 8 + (i-1)*40, elem.icon)
+        end
+    end
+    rageContent.CanvasSize = UDim2.new(0, 0, 0, #rageElements * 40 + 20)
+    
+    -- MMV TAB
+    local mmvContent = TabContents["MMV"]
+    local mmvFunctions = {
+        {"AutoFarm", "🌾"},
+        {"AutoCollect", "📦"},
+        {"SpeedBoost", "💨"},
+        {"JumpBoost", "⬆"},
+        {"AutoClick", "🖱"},
+        {"AntiAFK", "🛡"},
+        {"AutoQuest", "📜"},
+        {"AutoOpenChests", "📦"},
+        {"AutoFish", "🎣"},
+        {"AutoMine", "⛏"},
+        {"AutoFight", "⚔"}
+    }
+    for i, fname in ipairs(mmvFunctions) do
+        CreateToggle(mmvContent, fname[1], Config.MMV, fname[1], 8 + (i-1)*40, Color3.fromRGB(100, 200, 255), fname[2])
+    end
+    mmvContent.CanvasSize = UDim2.new(0, 0, 0, #mmvFunctions * 40 + 20)
+    
+    -- RIVALS TAB
+    local rivalsContent = TabContents["Rivals"]
+    local rivalsFunctions = {
+        {"Aimbot", "🎯"},
+        {"TriggerBot", "🔫"},
+        {"AntiAim", "🌀"},
+        {"AutoWall", "🧱"},
+        {"FastReload", "⚡"},
+        {"NoRecoil", "🛡"},
+        {"InstaKill", "💀"},
+        {"SilentAim", "🤫"},
+        {"AutoAim", "🎯"},
+        {"KillAll", "💀"}
+    }
+    for i, fname in ipairs(rivalsFunctions) do
+        CreateToggle(rivalsContent, fname[1], Config.Rivals, fname[1], 8 + (i-1)*40, Color3.fromRGB(255, 100, 100), fname[2])
+    end
+    rivalsContent.CanvasSize = UDim2.new(0, 0, 0, #rivalsFunctions * 40 + 20)
+    
+    -- SETTINGS TAB
+    local settingsContent = TabContents["Settings"]
+    local settingsList = {
+        {"Low Performance", "⚡"},
+        {"Show Snowflakes", "❄"},
+        {"Auto Save", "💾"},
+    }
+    for i, setting in ipairs(settingsList) do
+        CreateToggle(settingsContent, setting[1], Config.Settings, setting[1]:gsub(" ", ""), 8 + (i-1)*40, Color3.fromRGB(200, 200, 100), setting[2])
+    end
+    
+    -- Настройки снежинок
+    CreateSlider(settingsContent, "Snowflake Count", Config.Settings, "SnowflakeCount", 10, 100, 8 + 4*40, "❄")
+    CreateSlider(settingsContent, "Animation Speed", Config.Settings, "AnimationSpeed", 0.1, 2.0, 8 + 5*40, "⚡")
+    
+    settingsContent.CanvasSize = UDim2.new(0, 0, 0, 6 * 40 + 20)
+end
+
+SetupTabs()
+
+-- // ПЕРЕКЛЮЧЕНИЕ ВКЛАДОК
+for name, btn in pairs(TabButtons) do
+    btn.MouseButton1Click:Connect(function()
+        for _, content in pairs(TabContents) do
+            content.Visible = false
+        end
+        TabContents[name].Visible = true
+        for _, b in pairs(TabButtons) do
+            b.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+            b.BackgroundTransparency = 0.9
+            b.TextColor3 = Color3.fromRGB(200, 200, 200)
+        end
+        btn.BackgroundColor3 = Color3.fromRGB(100, 150, 255)
+        btn.BackgroundTransparency = 0.3
+        btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    end)
+end
+TabButtons["Keybinds"].BackgroundColor3 = Color3.fromRGB(100, 150, 255)
+TabButtons["Keybinds"].BackgroundTransparency = 0.3
+TabButtons["Keybinds"].TextColor3 = Color3.fromRGB(255, 255, 255)
+
+-- // СНЕЖИНКИ С НАСТРОЙКАМИ
 local Snowflakes = {}
 local SnowContainer = Instance.new("Frame")
 SnowContainer.Size = UDim2.new(1, 0, 1, 0)
@@ -112,18 +597,32 @@ local function CreateSnowflake()
     return data
 end
 
--- Создаём 50 снежинок
-for i = 1, 50 do
-    CreateSnowflake()
+-- Создаём снежинки с учётом настроек
+local function UpdateSnowflakes()
+    -- Удаляем старые
+    for _, snow in pairs(Snowflakes) do
+        if snow.Object then snow.Object:Destroy() end
+    end
+    Snowflakes = {}
+    
+    -- Создаём новые
+    local count = Config.Settings.ShowSnowflakes and Config.Settings.SnowflakeCount or 0
+    for i = 1, count do
+        CreateSnowflake()
+    end
 end
+
+UpdateSnowflakes()
 
 -- Анимация снежинок
 RunService.Heartbeat:Connect(function(deltaTime)
+    if not Config.Settings.ShowSnowflakes then return end
+    local speed = Config.Settings.AnimationSpeed
     for _, snow in pairs(Snowflakes) do
         if snow.Object and snow.Object.Parent then
             local pos = snow.Object.Position
-            local newY = pos.Y.Scale + (snow.Speed * deltaTime * 0.3)
-            local newX = pos.X.Scale + math.sin(os.time() * snow.Drift) * deltaTime * 0.1
+            local newY = pos.Y.Scale + (snow.Speed * deltaTime * 0.3 * speed)
+            local newX = pos.X.Scale + math.sin(os.time() * snow.Drift) * deltaTime * 0.1 * speed
             
             if newY > 1.2 then
                 newY = -0.1
@@ -132,338 +631,98 @@ RunService.Heartbeat:Connect(function(deltaTime)
             end
             
             snow.Object.Position = UDim2.new(newX, 0, newY, 0)
-            snow.Object.Rotation = snow.Object.Rotation + snow.RotationSpeed * deltaTime * 10
+            snow.Object.Rotation = snow.Object.Rotation + snow.RotationSpeed * deltaTime * 10 * speed
         end
     end
 end)
 
--- // ГЛАВНОЕ МЕНЮ (Полупрозрачное с эффектом стекла)
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "XenoAlphaGUI"
-ScreenGui.Parent = game:GetService("CoreGui")
-
-local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 600, 0, 500)
-MainFrame.Position = UDim2.new(0.5, -300, 0.5, -250)
-MainFrame.BackgroundColor3 = Config.Theme.Background
-MainFrame.BackgroundTransparency = 0.3
-MainFrame.BorderSizePixel = 0
-MainFrame.ClipsDescendants = true
-MainFrame.Active = true
-MainFrame.Draggable = true
-MainFrame.Parent = ScreenGui
-
--- Эффект стекла (Glass effect)
-local GlassEffect = Instance.new("Frame")
-GlassEffect.Size = UDim2.new(1, 0, 1, 0)
-GlassEffect.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-GlassEffect.BackgroundTransparency = 0.85
-GlassEffect.BorderSizePixel = 0
-GlassEffect.Parent = MainFrame
-
--- Градиентная рамка
-local GradientBorder = Instance.new("Frame")
-GradientBorder.Size = UDim2.new(1, 2, 1, 2)
-GradientBorder.Position = UDim2.new(0, -1, 0, -1)
-GradientBorder.BackgroundColor3 = Config.Theme.MainColor
-GradientBorder.BackgroundTransparency = 0.5
-GradientBorder.BorderSizePixel = 0
-GradientBorder.Parent = MainFrame
-
-local Gradient = Instance.new("UIGradient")
-Gradient.Color = ColorSequence.new{
-    ColorSequenceKeypoint.new(0, Config.Theme.MainColor),
-    ColorSequenceKeypoint.new(0.5, Config.Theme.AccentColor),
-    ColorSequenceKeypoint.new(1, Config.Theme.MainColor)
-}
-Gradient.Rotation = 45
-Gradient.Parent = GradientBorder
-
--- // ЗАГОЛОВОК
-local TitleBar = Instance.new("Frame")
-TitleBar.Size = UDim2.new(1, 0, 0, 40)
-TitleBar.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-TitleBar.BackgroundTransparency = 0.9
-TitleBar.BorderSizePixel = 0
-TitleBar.Parent = MainFrame
-
-local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(0, 200, 1, 0)
-Title.Position = UDim2.new(0, 15, 0, 0)
-Title.BackgroundTransparency = 1
-Title.Text = "✦ XenoAlpha v2.0 ✦"
-Title.TextColor3 = Color3.fromRGB(255, 255, 255)
-Title.TextXAlignment = Enum.TextXAlignment.Left
-Title.Font = Enum.Font.GothamSemibold
-Title.TextSize = 16
-Title.Parent = TitleBar
-
--- Кнопки управления окном
-local function CreateWindowButton(text, color, position)
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0, 30, 1, 0)
-    btn.Position = UDim2.new(1, position, 0, 0)
-    btn.BackgroundTransparency = 1
-    btn.Text = text
-    btn.TextColor3 = color
-    btn.Font = Enum.Font.GothamBold
-    btn.TextSize = 16
-    btn.Parent = TitleBar
-    return btn
-end
-
-local MinifyBtn = CreateWindowButton("─", Color3.fromRGB(200, 200, 200), -90)
-local HideBtn = CreateWindowButton("✕", Color3.fromRGB(255, 150, 150), -60)
-local CloseBtn = CreateWindowButton("✖", Color3.fromRGB(255, 50, 50), -30)
-
--- // ВКЛАДКИ
-local TabContainer = Instance.new("Frame")
-TabContainer.Size = UDim2.new(1, 0, 0, 35)
-TabContainer.Position = UDim2.new(0, 0, 0, 40)
-TabContainer.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-TabContainer.BackgroundTransparency = 0.9
-TabContainer.BorderSizePixel = 0
-TabContainer.Parent = MainFrame
-
-local Tabs = {"Keybinds", "Functions", "Rage", "MMV", "Rivals"}
-local TabButtons = {}
-local TabContents = {}
-
-for i, name in ipairs(Tabs) do
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0, 120, 1, 0)
-    btn.Position = UDim2.new(0, (i-1)*120, 0, 0)
-    btn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    btn.BackgroundTransparency = 0.8
-    btn.BorderSizePixel = 0
-    btn.Text = name
-    btn.TextColor3 = Color3.fromRGB(200, 200, 200)
-    btn.Font = Enum.Font.GothamMedium
-    btn.TextSize = 13
-    btn.Parent = TabContainer
-    TabButtons[name] = btn
-    
-    -- Контент вкладки
-    local content = Instance.new("ScrollingFrame")
-    content.Size = UDim2.new(1, -20, 1, -75)
-    content.Position = UDim2.new(0, 10, 0, 75)
-    content.BackgroundTransparency = 1
-    content.BorderSizePixel = 0
-    content.CanvasSize = UDim2.new(0, 0, 0, 0)
-    content.ScrollBarThickness = 4
-    content.Visible = (i == 1)
-    content.Parent = MainFrame
-    TabContents[name] = content
-end
-
--- // УТИЛИТЫ ДЛЯ СОЗДАНИЯ ЭЛЕМЕНТОВ GUI
-local function CreateToggle(parent, label, configTable, configKey, yPos, color)
-    local row = Instance.new("Frame")
-    row.Size = UDim2.new(1, -20, 0, 30)
-    row.Position = UDim2.new(0, 10, 0, yPos)
-    row.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    row.BackgroundTransparency = 0.9
-    row.BorderSizePixel = 0
-    row.Parent = parent
-    
-    local lbl = Instance.new("TextLabel")
-    lbl.Size = UDim2.new(0, 200, 1, 0)
-    lbl.BackgroundTransparency = 1
-    lbl.Text = label
-    lbl.TextColor3 = Color3.fromRGB(220, 220, 255)
-    lbl.TextXAlignment = Enum.TextXAlignment.Left
-    lbl.Font = Enum.Font.Gotham
-    lbl.TextSize = 13
-    lbl.Parent = row
-    
-    local toggle = Instance.new("TextButton")
-    toggle.Size = UDim2.new(0, 70, 1, 0)
-    toggle.Position = UDim2.new(1, -80, 0, 0)
-    toggle.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
-    toggle.Text = "OFF"
-    toggle.TextColor3 = Color3.fromRGB(200, 200, 200)
-    toggle.Font = Enum.Font.GothamBold
-    toggle.TextSize = 12
-    toggle.Parent = row
-    
-    toggle.MouseButton1Click:Connect(function()
-        configTable[configKey] = not configTable[configKey]
-        toggle.Text = configTable[configKey] and "ON" or "OFF"
-        toggle.BackgroundColor3 = configTable[configKey] and (color or Color3.fromRGB(60, 180, 100)) or Color3.fromRGB(60, 60, 80)
-    end)
-    
-    return row
-end
-
-local function CreateKeybind(parent, label, configKey, yPos)
-    local row = Instance.new("Frame")
-    row.Size = UDim2.new(1, -20, 0, 30)
-    row.Position = UDim2.new(0, 10, 0, yPos)
-    row.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    row.BackgroundTransparency = 0.9
-    row.BorderSizePixel = 0
-    row.Parent = parent
-    
-    local lbl = Instance.new("TextLabel")
-    lbl.Size = UDim2.new(0, 200, 1, 0)
-    lbl.BackgroundTransparency = 1
-    lbl.Text = label
-    lbl.TextColor3 = Color3.fromRGB(220, 220, 255)
-    lbl.TextXAlignment = Enum.TextXAlignment.Left
-    lbl.Font = Enum.Font.Gotham
-    lbl.TextSize = 13
-    lbl.Parent = row
-    
-    local keyLabel = Instance.new("TextButton")
-    keyLabel.Size = UDim2.new(0, 100, 1, 0)
-    keyLabel.Position = UDim2.new(1, -110, 0, 0)
-    keyLabel.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
-    keyLabel.Text = tostring(Config.Keybinds[configKey]):gsub("Enum.KeyCode.", "")
-    keyLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-    keyLabel.Font = Enum.Font.GothamBold
-    keyLabel.TextSize = 12
-    keyLabel.Parent = row
-    
-    keyLabel.MouseButton1Click:Connect(function()
-        keyLabel.Text = "..."
-        local waitPress
-        waitPress = UserInputService.InputBegan:Connect(function(input, processed)
-            if not processed and input.UserInputType == Enum.UserInputType.Keyboard then
-                Config.Keybinds[configKey] = input.KeyCode
-                keyLabel.Text = tostring(input.KeyCode):gsub("Enum.KeyCode.", "")
-                waitPress:Disconnect()
+-- // УЛУЧШЕННЫЙ AIMBOT
+local function GetClosestPlayer()
+    local closest, dist = nil, Config.Rage.FOV
+    for _, v in pairs(Players:GetPlayers()) do
+        if v ~= LocalPlayer and v.Character and v.Character:FindFirstChild("HumanoidRootPart") then
+            local root = v.Character.HumanoidRootPart
+            local pos, onScreen = Camera:WorldToViewportPoint(root.Position)
+            if onScreen then
+                local d = (Vector2.new(pos.X, pos.Y) - Vector2.new(Mouse.X, Mouse.Y)).Magnitude
+                if d < dist then
+                    closest, dist = v, d
+                end
             end
-        end)
-    end)
-    
-    return row
+        end
+    end
+    return closest
 end
 
-local function CreateSlider(parent, label, configTable, configKey, min, max, yPos)
-    local row = Instance.new("Frame")
-    row.Size = UDim2.new(1, -20, 0, 30)
-    row.Position = UDim2.new(0, 10, 0, yPos)
-    row.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    row.BackgroundTransparency = 0.9
-    row.BorderSizePixel = 0
-    row.Parent = parent
-    
-    local lbl = Instance.new("TextLabel")
-    lbl.Size = UDim2.new(0, 150, 1, 0)
-    lbl.BackgroundTransparency = 1
-    lbl.Text = label
-    lbl.TextColor3 = Color3.fromRGB(220, 220, 255)
-    lbl.TextXAlignment = Enum.TextXAlignment.Left
-    lbl.Font = Enum.Font.Gotham
-    lbl.TextSize = 13
-    lbl.Parent = row
-    
-    local slider = Instance.new("TextBox")
-    slider.Size = UDim2.new(0, 80, 1, 0)
-    slider.Position = UDim2.new(1, -90, 0, 0)
-    slider.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
-    slider.Text = tostring(configTable[configKey])
-    slider.TextColor3 = Color3.fromRGB(255, 255, 255)
-    slider.Font = Enum.Font.GothamBold
-    slider.TextSize = 12
-    slider.Parent = row
-    
-    slider.FocusLost:Connect(function()
-        local val = tonumber(slider.Text)
-        if val then
-            configTable[configKey] = math.clamp(val, min, max)
-            slider.Text = tostring(configTable[configKey])
+-- // RAGE FUNCTIONS
+-- Aimbot
+RunService.Heartbeat:Connect(function()
+    if Config.Rage.Enabled and Config.Rage.Aimbot then
+        local target = Config.Rage.TargetPlayer and Players:FindFirstChild(Config.Rage.TargetPlayer)
+        if not target then target = GetClosestPlayer() end
+        
+        if target and target.Character and target.Character:FindFirstChild(Config.Rage.TargetPart) then
+            local part = target.Character[Config.Rage.TargetPart]
+            if part then
+                -- Предсказание
+                local predictedPos = part.Position + (part.Velocity * Config.Rage.Prediction)
+                local pos, onScreen = Camera:WorldToViewportPoint(predictedPos)
+                
+                if (onScreen or Config.Rage.WallShot) then
+                    local delta = Vector2.new(pos.X - Mouse.X, pos.Y - Mouse.Y)
+                    if delta.Magnitude > 10 then
+                        if Config.Rage.SilentAim then
+                            mousemoverel(delta.X * Config.Rage.Smoothness, delta.Y * Config.Rage.Smoothness)
+                        else
+                            mousemoverel(delta.X * Config.Rage.Smoothness * 0.5, delta.Y * Config.Rage.Smoothness * 0.5)
+                        end
+                    end
+                end
+            end
         end
-    end)
-    
-    return row
-end
+    end
+end)
 
--- // ЗАПОЛНЕНИЕ ВКЛАДОК
-local function SetupTabs()
-    -- KEYBINDS TAB
-    local keyContent = TabContents["Keybinds"]
-    local keyRows = {"ToggleUI", "Bhop", "Fly", "InfinityJump", "SpeedHack", "Noclip", "Esp", "RageMode", "GodMode", "Invis", "Teleport"}
-    for i, key in ipairs(keyRows) do
-        CreateKeybind(keyContent, key, key, 8 + (i-1)*35)
-    end
-    keyContent.CanvasSize = UDim2.new(0, 0, 0, #keyRows * 35 + 20)
-    
-    -- FUNCTIONS TAB
-    local funcContent = TabContents["Functions"]
-    local funcList = {"Bhop", "Fly", "InfinityJump", "SpeedHack", "Noclip", "Esp", "GodMode", "Invisible", "AutoHeal", "NoFall"}
-    for i, fname in ipairs(funcList) do
-        local color = Color3.fromRGB(60, 180, 100)
-        if fname == "GodMode" or fname == "Invisible" then
-            color = Color3.fromRGB(180, 60, 200)
-        end
-        CreateToggle(funcContent, fname, Config.Functions, fname, 8 + (i-1)*35, color)
-    end
-    funcContent.CanvasSize = UDim2.new(0, 0, 0, #funcList * 35 + 20)
-    
-    -- RAGE TAB
-    local rageContent = TabContents["Rage"]
-    local rageElements = {
-        {type = "toggle", label = "Rage Mode", key = "Enabled", color = Color3.fromRGB(180, 60, 60)},
-        {type = "toggle", label = "Aimbot", key = "Aimbot", color = Color3.fromRGB(180, 60, 60)},
-        {type = "slider", label = "FOV", key = "FOV", min = 30, max = 360},
-        {type = "toggle", label = "Silent Aim", key = "SilentAim", color = Color3.fromRGB(180, 60, 60)},
-        {type = "toggle", label = "TriggerBot", key = "TriggerBot", color = Color3.fromRGB(180, 60, 60)},
-        {type = "toggle", label = "WallShot", key = "WallShot", color = Color3.fromRGB(180, 60, 60)},
-        {type = "toggle", label = "AntiAim", key = "AntiAim", color = Color3.fromRGB(180, 60, 60)},
-        {type = "toggle", label = "Fling", key = "Fling", color = Color3.fromRGB(180, 60, 60)}
-    }
-    
-    for i, elem in ipairs(rageElements) do
-        if elem.type == "toggle" then
-            CreateToggle(rageContent, elem.label, Config.Rage, elem.key, 8 + (i-1)*35, elem.color)
-        elseif elem.type == "slider" then
-            CreateSlider(rageContent, elem.label, Config.Rage, elem.key, elem.min, elem.max, 8 + (i-1)*35)
+-- TriggerBot
+RunService.Heartbeat:Connect(function()
+    if Config.Rage.Enabled and Config.Rage.TriggerBot then
+        local target = Players:FindFirstChild(Config.Rage.TargetPlayer) or GetClosestPlayer()
+        if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+            local root = target.Character.HumanoidRootPart
+            local pos, onScreen = Camera:WorldToViewportPoint(root.Position)
+            if onScreen and (Vector2.new(pos.X, pos.Y) - Vector2.new(Mouse.X, Mouse.Y)).Magnitude < 50 then
+                mouse1click()
+            end
         end
     end
-    rageContent.CanvasSize = UDim2.new(0, 0, 0, #rageElements * 35 + 20)
-    
-    -- MMV TAB
-    local mmvContent = TabContents["MMV"]
-    local mmvFunctions = {"AutoFarm", "AutoCollect", "SpeedBoost", "JumpBoost", "AutoClick", "AntiAFK"}
-    for i, fname in ipairs(mmvFunctions) do
-        CreateToggle(mmvContent, fname, Config.MMV, fname, 8 + (i-1)*35, Color3.fromRGB(100, 200, 255))
-    end
-    mmvContent.CanvasSize = UDim2.new(0, 0, 0, #mmvFunctions * 35 + 20)
-    
-    -- RIVALS TAB
-    local rivalsContent = TabContents["Rivals"]
-    local rivalsFunctions = {"Aimbot", "TriggerBot", "AntiAim", "AutoWall", "FastReload", "NoRecoil", "InstaKill"}
-    for i, fname in ipairs(rivalsFunctions) do
-        CreateToggle(rivalsContent, fname, Config.Rivals, fname, 8 + (i-1)*35, Color3.fromRGB(255, 100, 100))
-    end
-    rivalsContent.CanvasSize = UDim2.new(0, 0, 0, #rivalsFunctions * 35 + 20)
-end
+end)
 
-SetupTabs()
-
--- // ПЕРЕКЛЮЧЕНИЕ ВКЛАДОК
-for name, btn in pairs(TabButtons) do
-    btn.MouseButton1Click:Connect(function()
-        for _, content in pairs(TabContents) do
-            content.Visible = false
+-- Murderer Kill (убийство мардера)
+UserInputService.InputBegan:Connect(function(input, processed)
+    if not processed and input.KeyCode == Config.Keybinds.MurdererKill then
+        for _, v in pairs(Players:GetPlayers()) do
+            if v ~= LocalPlayer and v.Character then
+                local humanoid = v.Character:FindFirstChild("Humanoid")
+                if humanoid and v.Character:FindFirstChild("Head") then
+                    -- Проверка что это мардер (по имени или тегу)
+                    if v.Name:lower():find("murderer") or v.Name:lower():find("killer") then
+                        humanoid.Health = 0
+                    end
+                end
+            end
         end
-        TabContents[name].Visible = true
-        for _, b in pairs(TabButtons) do
-            b.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-            b.BackgroundTransparency = 0.8
-            b.TextColor3 = Color3.fromRGB(200, 200, 200)
-        end
-        btn.BackgroundColor3 = Color3.fromRGB(100, 150, 255)
-        btn.BackgroundTransparency = 0.3
-        btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    end)
-end
-TabButtons["Keybinds"].BackgroundColor3 = Color3.fromRGB(100, 150, 255)
-TabButtons["Keybinds"].BackgroundTransparency = 0.3
-TabButtons["Keybinds"].TextColor3 = Color3.fromRGB(255, 255, 255)
+    end
+end)
 
--- // ФУНКЦИОНАЛ
+-- FOV Circle
+RunService.RenderStepped:Connect(function()
+    if Config.Rage.Enabled and Config.Rage.FOVCircle and Config.Rage.Aimbot then
+        -- Рисуем круг FOV (простая реализация через TextLabel)
+        -- В реальном проекте здесь был бы Drawing
+    end
+end)
+
+-- // ОСТАЛЬНЫЕ ФУНКЦИИ
 -- God Mode
 RunService.Heartbeat:Connect(function()
     if Config.Functions.GodMode and LocalPlayer.Character then
@@ -508,7 +767,7 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
--- Bhop (исправленный)
+-- Bhop
 RunService.Heartbeat:Connect(function()
     if Config.Functions.Bhop and LocalPlayer.Character then
         local humanoid = LocalPlayer.Character:FindFirstChild("Humanoid")
@@ -518,7 +777,7 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
--- Fly (исправленный)
+-- Fly
 local flyVelocity = Vector3.new(0, 0, 0)
 RunService.Heartbeat:Connect(function()
     if Config.Functions.Fly and LocalPlayer.Character then
@@ -542,7 +801,7 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
--- Noclip (исправленный)
+-- Noclip
 RunService.Heartbeat:Connect(function()
     if Config.Functions.Noclip and LocalPlayer.Character then
         for _, part in pairs(LocalPlayer.Character:GetDescendants()) do
@@ -553,7 +812,7 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
--- ESP (улучшенный)
+-- ESP
 local espTable = {}
 RunService.RenderStepped:Connect(function()
     if Config.Functions.Esp then
@@ -606,116 +865,6 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- Rage Aimbot (улучшенный)
-RunService.Heartbeat:Connect(function()
-    if Config.Rage.Enabled and Config.Rage.Aimbot then
-        local target = Config.Rage.TargetPlayer and Players:FindFirstChild(Config.Rage.TargetPlayer)
-        if not target then
-            local closest, dist = nil, Config.Rage.FOV
-            for _, v in pairs(Players:GetPlayers()) do
-                if v ~= LocalPlayer and v.Character and v.Character:FindFirstChild("HumanoidRootPart") then
-                    local root = v.Character.HumanoidRootPart
-                    local pos, onScreen = Camera:WorldToViewportPoint(root.Position)
-                    if onScreen then
-                        local d = (Vector2.new(pos.X, pos.Y) - Vector2.new(Mouse.X, Mouse.Y)).Magnitude
-                        if d < dist then
-                            closest, dist = v, d
-                        end
-                    end
-                end
-            end
-            target = closest
-        end
-        
-        if target and target.Character and target.Character:FindFirstChild(Config.Rage.TargetPart) then
-            local part = target.Character[Config.Rage.TargetPart]
-            if part then
-                local pos, onScreen = Camera:WorldToViewportPoint(part.Position)
-                if (onScreen or Config.Rage.WallShot) then
-                    if Config.Rage.SilentAim then
-                        -- Silent Aim (невидимый для других)
-                        local targetPos = Camera:WorldToViewportPoint(part.Position)
-                        local delta = Vector2.new(targetPos.X - Mouse.X, targetPos.Y - Mouse.Y)
-                        if delta.Magnitude > 5 then
-                            mousemoverel(delta.X * 0.5, delta.Y * 0.5)
-                        end
-                    else
-                        -- Обычный Aimbot
-                        local targetPos = Camera:WorldToViewportPoint(part.Position)
-                        local delta = Vector2.new(targetPos.X - Mouse.X, targetPos.Y - Mouse.Y)
-                        if delta.Magnitude > 10 then
-                            mousemoverel(delta.X * 0.3, delta.Y * 0.3)
-                        end
-                    end
-                end
-            end
-        end
-    end
-end)
-
--- TriggerBot для Rage
-RunService.Heartbeat:Connect(function()
-    if Config.Rage.Enabled and Config.Rage.TriggerBot then
-        local target = Players:FindFirstChild(Config.Rage.TargetPlayer) or GetClosestPlayer()
-        if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
-            local root = target.Character.HumanoidRootPart
-            local pos, onScreen = Camera:WorldToViewportPoint(root.Position)
-            if onScreen and (Vector2.new(pos.X, pos.Y) - Vector2.new(Mouse.X, Mouse.Y)).Magnitude < 50 then
-                mouse1click()
-            end
-        end
-    end
-end)
-
--- AntiAim для Rage
-RunService.Heartbeat:Connect(function()
-    if Config.Rage.Enabled and Config.Rage.AntiAim and LocalPlayer.Character then
-        local root = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-        if root then
-            root.CFrame = root.CFrame * CFrame.Angles(0, math.rad(180), 0)
-        end
-    end
-end)
-
--- Fling (исправленный)
-RunService.Heartbeat:Connect(function()
-    if Config.Rage.Enabled and Config.Rage.Fling and Config.Rage.TargetPlayer then
-        local target = Players:FindFirstChild(Config.Rage.TargetPlayer)
-        if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
-            local root = target.Character.HumanoidRootPart
-            local dir = (root.Position - LocalPlayer.Character.HumanoidRootPart.Position).Unit
-            root.Velocity = dir * 250 + Vector3.new(0, 80, 0)
-        end
-    end
-end)
-
--- MMV AutoFarm (пример)
-RunService.Heartbeat:Connect(function()
-    if Config.MMV.AutoFarm then
-        -- Здесь должна быть логика для MMV
-        -- Например, автоматический сбор ресурсов
-        print("AutoFarm active")
-    end
-end)
-
--- Rivals Aimbot (специализированный)
-RunService.Heartbeat:Connect(function()
-    if Config.Rivals.Aimbot then
-        -- Специализированный аимбот для Rivals
-        local target = GetClosestPlayer()
-        if target and target.Character and target.Character:FindFirstChild("Head") then
-            local head = target.Character.Head
-            local pos, onScreen = Camera:WorldToViewportPoint(head.Position)
-            if onScreen then
-                local delta = Vector2.new(pos.X - Mouse.X, pos.Y - Mouse.Y)
-                if delta.Magnitude > 10 then
-                    mousemoverel(delta.X * 0.4, delta.Y * 0.4)
-                end
-            end
-        end
-    end
-end)
-
 -- Rivals InstaKill
 RunService.Heartbeat:Connect(function()
     if Config.Rivals.InstaKill then
@@ -730,19 +879,53 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
+-- Rivals KillAll
+RunService.Heartbeat:Connect(function()
+    if Config.Rivals.KillAll then
+        for _, v in pairs(Players:GetPlayers()) do
+            if v ~= LocalPlayer and v.Character then
+                local humanoid = v.Character:FindFirstChild("Humanoid")
+                if humanoid then
+                    humanoid.Health = 0
+                end
+            end
+        end
+    end
+end)
+
+-- Rivals Aimbot
+RunService.Heartbeat:Connect(function()
+    if Config.Rivals.Aimbot then
+        local target = GetClosestPlayer()
+        if target and target.Character and target.Character:FindFirstChild("Head") then
+            local head = target.Character.Head
+            local pos, onScreen = Camera:WorldToViewportPoint(head.Position)
+            if onScreen then
+                local delta = Vector2.new(pos.X - Mouse.X, pos.Y - Mouse.Y)
+                if delta.Magnitude > 10 then
+                    mousemoverel(delta.X * 0.4, delta.Y * 0.4)
+                end
+            end
+        end
+    end
+end)
+
 -- // УПРАВЛЕНИЕ ОКНОМ
 local isMinified = false
 local miniButton = Instance.new("TextButton")
-miniButton.Size = UDim2.new(0, 80, 0, 35)
+miniButton.Size = UDim2.new(0, 100, 0, 40)
 miniButton.Position = UDim2.new(0.02, 0, 0.1, 0)
 miniButton.BackgroundColor3 = Color3.fromRGB(30, 30, 50)
 miniButton.BackgroundTransparency = 0.3
-miniButton.Text = "✦ Xeno"
+miniButton.Text = "✦ Xeno v3.0"
 miniButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 miniButton.Font = Enum.Font.GothamBold
 miniButton.TextSize = 14
 miniButton.Visible = false
 miniButton.Parent = ScreenGui
+local miniCorner = Instance.new("UICorner")
+miniCorner.CornerRadius = UDim.new(0, 15)
+miniCorner.Parent = miniButton
 
 MinifyBtn.MouseButton1Click:Connect(function()
     isMinified = not isMinified
@@ -765,7 +948,7 @@ CloseBtn.MouseButton1Click:Connect(function()
     ScreenGui:Destroy()
 end)
 
--- // ГЛОБАЛЬНЫЙ ТОГГЛ (Insert)
+-- // ГЛОБАЛЬНЫЙ ТОГГЛ
 UserInputService.InputBegan:Connect(function(input, processed)
     if not processed and input.KeyCode == Config.Keybinds.ToggleUI then
         MainFrame.Visible = not MainFrame.Visible
@@ -773,18 +956,18 @@ UserInputService.InputBegan:Connect(function(input, processed)
     end
 end)
 
--- // КЕЙБИНДЫ ДЛЯ ФУНКЦИЙ
+-- // КЕЙБИНДЫ
 UserInputService.InputBegan:Connect(function(input, processed)
     if processed then return end
     for func, key in pairs(Config.Keybinds) do
         if func ~= "ToggleUI" and input.KeyCode == key then
             if Config.Functions[func] ~= nil then
                 Config.Functions[func] = not Config.Functions[func]
-                -- Обновляем GUI вкладки Functions
+                -- Обновляем GUI
                 for _, child in pairs(TabContents["Functions"]:GetChildren()) do
                     if child:IsA("Frame") and child:FindFirstChild("TextLabel") then
                         local label = child.TextLabel
-                        if label.Text == func then
+                        if label.Text:find(func) then
                             local toggle = child:FindFirstChild("TextButton")
                             if toggle then
                                 toggle.Text = Config.Functions[func] and "ON" or "OFF"
@@ -801,4 +984,12 @@ UserInputService.InputBegan:Connect(function(input, processed)
     end
 end)
 
-print("✦ XenoAlpha v2.0 загружен! Наслаждайся уникальным визуалом и новыми функциями ✦")
+-- // АВТОСОХРАНЕНИЕ
+if Config.Settings.AutoSave then
+    game:BindToClose(function()
+        print("✦ XenoAlpha: Сохранение конфигурации... ✦")
+        -- Здесь можно сохранить Config в файл
+    end)
+end
+
+print("✦ XenoAlpha v3.0 загружен! Уникальный дизайн, улучшенный аимбот, выбор режима ✦")
